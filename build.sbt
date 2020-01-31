@@ -13,3 +13,5 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
   "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime
 )
+
+enablePlugins(JavaAppPackaging)
