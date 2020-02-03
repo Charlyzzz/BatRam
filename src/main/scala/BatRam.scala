@@ -58,10 +58,12 @@ object ClusterStateListener {
 
 
 object A extends App {
-  val system = ActorSystem(HttpRam(), "HttpRam", ConfigFactory.empty)
+
+  val httpRam = HttpRam("localhost", 3000, "http://localhost:3000/hi")
+  val system = ActorSystem(httpRam, "HttpRam", ConfigFactory.empty)
   implicit val materializer: Materializer = Materializer(system)
 
   StreamConverters.fromInputStream(() => System.in)
-    .collect(_.utf8String.filter(_ >= ' ').toInt)
-    .runForeach(system.tell)
+      .collect(_.utf8String.filter(_ >= ' ').toInt)
+      .runForeach(system.tell)
 }
