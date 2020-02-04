@@ -3,8 +3,8 @@ package batram
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.marshalling.sse.EventStreamMarshalling._
+import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.server.Directives.{complete, concat, get, getFromResource, path, pathEndOrSingleSlash}
 import akka.stream.scaladsl.{BroadcastHub, Sink}
 

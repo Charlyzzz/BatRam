@@ -1,17 +1,23 @@
 package rampup
 
+import akka.actor.typed.receptionist.{Receptionist, ServiceKey}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import batram.DynamicThrottle.{Message, Update}
-import rampup.Linear.Target
+import rampup.Handler.serviceKey
 
-import scala.concurrent.duration._
+
+object Handler {
+  val serviceKey: ServiceKey[Int] = ServiceKey("meters")
+}
 
 object Manual {
 
-  def apply()(throttler: ActorRef[Message]): Behavior[Target] = Behaviors.receiveMessage[Target] {
-    case Target(rps) =>
-      throttler ! Update(rps, 1.second)
-      Behaviors.same
+  def apply(throttler: ActorRef[Int]): Behavior[Int] = Behaviors.setup { ctx =>
+    ctx.system.receptionist ! Receptionist.register(serviceKey, ctx.self)
+    Behaviors.receiveMessage {
+      rps =>
+        throttler ! rps
+        Behaviors.same
+    }
   }
 }

@@ -70,13 +70,13 @@ class DynamicThrottle[A](n: Int, per: FiniteDuration)(throttler: ActorRef[Messag
 object DynamicThrottle {
 
   val behavior: Behavior[Message] = Behaviors.setup { _ =>
-    def linked(actor: ActorRef[Any]): Behaviors.Receive[Message] = Behaviors.receiveMessagePartial {
+    def linked(actor: ActorRef[Any]) = Behaviors.receiveMessagePartial[Message] {
       case u: Update =>
         actor ! u
         Behaviors.same
     }
 
-    def waitingLink: Behaviors.Receive[Message] = Behaviors.receiveMessagePartial {
+    val waitingLink = Behaviors.receiveMessagePartial[Message] {
       case LinkThrottle(actor) => linked(actor)
     }
 
