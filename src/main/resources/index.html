@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BatRam monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
+</head>
+<body>
+
+<div style="width:75%;">
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+  const chartColors = {
+    red: 'rgb(255, 99, 132)',
+    orange: 'rgb(255, 159, 64)',
+    yellow: 'rgb(255, 205, 86)',
+    green: 'rgb(75, 192, 192)',
+    blue: 'rgb(54, 162, 235)',
+    purple: 'rgb(153, 102, 255)',
+    grey: 'rgb(201, 203, 207)'
+  };
+
+  const data = [];
+  const labels = [];
+
+  const config = {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'My First dataset',
+        backgroundColor: chartColors.red,
+        borderColor: chartColors.red,
+        data,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      title: {
+        display: true,
+        text: 'Chart.js Line Chart'
+      },
+      tooltips: {
+        mode: 'index',
+        intersect: false
+      },
+      hover: {
+        mode: 'nearest',
+        intersect: true
+      },
+      scales: {
+        x: {
+          display: true,
+          scaleLabel: {
+            display: true,
+            labelString: 'Month'
+          }
+        },
+        y: {
+          display: true,
+          scaleLabel: {
+            display: true,
+            labelString: 'Value'
+          }
+        }
+      }
+    }
+  };
+
+
+  window.onload = function () {
+    const ctx = document.getElementById('canvas').getContext('2d');
+    const myLine = new Chart(ctx, config);
+
+    const addValue = (v) => {
+      data.push(v);
+      labels.push('');
+      if (labels.length > 50) {
+        labels.shift();
+        data.shift();
+      }
+      myLine.update();
+    };
+
+    const evtSource = new EventSource('events');
+    evtSource.onmessage = (sse) => {
+      try {
+        const { rps } = JSON.parse(sse.data);
+        addValue(parseInt(rps));
+      } catch (e) {
+        console.error(e);
+      }
+    };
+  };
+</script>
+</body>
+</html>

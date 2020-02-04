@@ -1,3 +1,5 @@
+package batram
+
 import java.time.LocalDateTime
 
 import akka.actor.typed.scaladsl.Behaviors
@@ -10,9 +12,8 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, Source, StreamConverters}
+import akka.stream.scaladsl.{Sink, Source}
 import akka.{actor => classic}
-import com.typesafe.config.ConfigFactory
 
 import scala.util.{Failure, Success}
 
@@ -28,8 +29,7 @@ object BatRam extends App {
   val masterAddress: Address = AddressFromURIString("akka://batram-cluster@localhost:25520")
   if (cluster.selfMember.address != masterAddress)
     cluster.manager ! JoinSeedNodes(masterAddress :: Nil)
-
-  private val poolSettings: ConnectionPoolSettings = ConnectionPoolSettings(classicSystem).withMaxConnections(64).withMaxOpenRequests(1024)
+  val poolSettings: ConnectionPoolSettings = ConnectionPoolSettings(classicSystem).withMaxConnections(64).withMaxOpenRequests(1024)
   val pool = Http().cachedHostConnectionPool[Int]("localhost", 8558, poolSettings)
 
   Source(1 to 100)
@@ -45,8 +45,7 @@ object BatRamSystem {
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing] { ctx =>
     ctx.spawn(ClusterStateListener(), "ClusterListener")
     Behaviors.empty
-  }.narrow
-
+  }
 }
 
 object ClusterStateListener {
@@ -54,16 +53,4 @@ object ClusterStateListener {
     Cluster(ctx.system).subscriptions ! Subscribe(ctx.self, classOf[MemberEvent])
     Behaviors.logMessages(Behaviors.ignore)
   }
-}
-
-
-object A extends App {
-
-  val httpRam = HttpRam("localhost", 3000, "http://localhost:3000/hi")
-  val system = ActorSystem(httpRam, "HttpRam", ConfigFactory.empty)
-  implicit val materializer: Materializer = Materializer(system)
-
-  StreamConverters.fromInputStream(() => System.in)
-      .collect(_.utf8String.filter(_ >= ' ').toInt)
-      .runForeach(system.tell)
 }
