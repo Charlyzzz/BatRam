@@ -8,24 +8,23 @@ import rampup.Handler.serviceKey
 import scala.concurrent.duration._
 
 
-case class Stable(value: Int)
-
-case class MovingTowards(current: Int, target: Int, delta: Int) {
-
-  val reached: Boolean = current == target
-
-  def step: MovingTowards = {
-    if (target > current)
-      copy(target.min(current + delta))
-    else if (target < current)
-      copy(target.max(current - delta))
-    else
-      this
-  }
-}
-
-
 object Linear {
+
+  case class Stable(value: Int)
+
+  case class MovingTowards(current: Int, target: Int, delta: Int) {
+
+    val reached: Boolean = current == target
+
+    def step: MovingTowards = {
+      if (target > current)
+        copy(target.min(current + delta))
+      else if (target < current)
+        copy(target.max(current - delta))
+      else
+        this
+    }
+  }
 
   case class TryReach(rps: Int)
 

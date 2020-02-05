@@ -10,7 +10,7 @@ object Coordinator {
 
   trait Protocol
 
-  case class ReceptionistListing(a: Listing) extends Protocol
+  case class ReceptionistListing(actorListings: Listing) extends Protocol
 
   trait Message extends Protocol
 
