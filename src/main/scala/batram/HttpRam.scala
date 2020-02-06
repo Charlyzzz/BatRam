@@ -7,7 +7,6 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpRequest
-import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
@@ -20,7 +19,7 @@ import scala.util.{Failure, Success}
 object HttpRam {
 
   def apply(host: String, port: Int, uri: String)
-           (poolSettings: ConnectionPoolSettings, eventSink: Sink[ServerSentEvent, _]): Behavior[Int] =
+           (poolSettings: ConnectionPoolSettings, eventSink: Sink[Stats, _]): Behavior[Int] =
     Behaviors.setup { ctx =>
       implicit val mat: Materializer = Materializer(ctx)
       implicit val classicSystem: ActorSystem = ctx.system.toClassic

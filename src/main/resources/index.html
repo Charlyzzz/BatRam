@@ -13,29 +13,41 @@
 
 <script>
   const chartColors = {
-    red: 'rgb(255, 99, 132)',
-    orange: 'rgb(255, 159, 64)',
-    yellow: 'rgb(255, 205, 86)',
-    green: 'rgb(75, 192, 192)',
-    blue: 'rgb(54, 162, 235)',
-    purple: 'rgb(153, 102, 255)',
-    grey: 'rgb(201, 203, 207)'
+    0: 'rgb(255, 99, 132)',
+    1: 'rgb(255, 159, 64)',
+    2: 'rgb(255, 205, 86)',
+    3: 'rgb(75, 192, 192)',
+    4: 'rgb(54, 162, 235)',
+    5: 'rgb(153, 102, 255)',
+    6: 'rgb(201, 203, 207)'
   };
 
-  const data = [];
-  const labels = [];
+
+  const createDataset = (name, color) => {
+    return {
+      label: name,
+      backgroundColor: color,
+      borderColor: color,
+      data: [],
+      fill: false
+    };
+  };
+
+  /*
+  let datasets = [{
+    label: 'My First dataset',
+    backgroundColor: chartColors.red,
+    borderColor: chartColors.red,
+    data,
+    fill: false
+  }];
+   */
 
   const config = {
     type: 'line',
     data: {
-      labels,
-      datasets: [{
-        label: 'My First dataset',
-        backgroundColor: chartColors.red,
-        borderColor: chartColors.red,
-        data,
-        fill: false
-      }]
+      labels: [],
+      datasets: []
     },
     options: {
       responsive: true,
@@ -75,21 +87,29 @@
     const ctx = document.getElementById('canvas').getContext('2d');
     const myLine = new Chart(ctx, config);
 
-    const addValue = (v) => {
+    const addValue = (n, v) => {
+
+      const { data } = config.data.datasets.find(d => d.label === n);
       data.push(v);
-      labels.push('');
-      if (labels.length > 50) {
-        labels.shift();
+      config.data.labels.push('');
+      if (config.data.labels.length > 50) {
+        config.data.labels.shift();
         data.shift();
       }
       myLine.update();
     };
-
-    const evtSource = new EventSource('events');
+    const addresses = [];
+    const evtSource = new EventSource('metrics');
     evtSource.onmessage = (sse) => {
       try {
-        const { rps } = JSON.parse(sse.data);
-        addValue(parseInt(rps));
+        const { rps, address } = JSON.parse(sse.data);
+        if (addresses.indexOf(address) === -1) {
+          const index = addresses.push(address) - 1;
+          config.data.datasets.push(createDataset(address, chartColors[0]));
+          myLine.update();
+        }
+        addValue(address, parseInt(rps));
+
       } catch (e) {
         console.error(e);
       }

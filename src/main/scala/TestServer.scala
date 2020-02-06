@@ -17,10 +17,10 @@ object TestServer extends App {
   private val handler = Flow[HttpRequest].delay(400.millis, DelayOverflowStrategy.fail).map(_ => HttpResponse())
 
   val serverSettings = ServerSettings(system)
-      .withMaxConnections(16384)
-      .withPipeliningLimit(1)
+    .withMaxConnections(16384)
+    .withPipeliningLimit(1)
 
-  Http().bindAndHandle(handler = handler, interface = "0.0.0.0", port =3000, settings = serverSettings)
+  Http().bindAndHandle(handler = handler, interface = "0.0.0.0", port = 3000, settings = serverSettings)
     .flatMap(_.whenTerminated)
     .onComplete(_ => system.terminate())
 }

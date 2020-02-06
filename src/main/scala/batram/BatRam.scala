@@ -1,18 +1,23 @@
 package batram
 
-import akka.actor.AddressFromURIString
+import akka.actor.CoordinatedShutdown.UnknownReason
 import akka.actor.typed.receptionist.{Receptionist, ServiceKey}
 import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, SupervisorStrategy}
+import akka.actor.{AddressFromURIString, CoordinatedShutdown}
 import akka.cluster.ClusterEvent.MemberEvent
 import akka.cluster.typed._
-import akka.http.scaladsl.model.sse.ServerSentEvent
 import akka.http.scaladsl.settings.ConnectionPoolSettings
-import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, StreamConverters}
-import batram.Coordinator.F
+import akka.stream.scaladsl.{Sink, StreamRefs}
+import akka.stream.{Materializer, SinkRef}
+import akka.util.Timeout
+import batram.Coordinator.{F, GetEventSink, SetEventSink}
 import rampup.{Handler, Manual}
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 object BatRam extends App {
 
@@ -24,6 +29,7 @@ object BatRam extends App {
     require(masterAddress.isDefined, "provide MASTER_ADDRESS")
     ActorSystem[Nothing](WorkerGuardian(masterAddress.get), "batram-cluster")
   }
+
 }
 
 trait GuardianBehavior {
@@ -34,7 +40,7 @@ trait GuardianBehavior {
       .init(SingletonActor(supervisedCoordinator, "Coordinator"))
   }
 
-  def spawnRam(ctx: ActorContext[_], eventSink: Sink[ServerSentEvent, _] = Sink.ignore): Unit = {
+  def spawnRam(ctx: ActorContext[_], eventSink: Sink[Stats, _] = Sink.ignore): Unit = {
     val maxConnections = sys.env.get("MC").collect(_.toInt).getOrElse(16384)
     val maxOpenRequests = sys.env.get("OR").collect(_.toInt).getOrElse(32768)
     val pipeliningLimit = sys.env.get("PL").collect(_.toInt).getOrElse(16)
@@ -64,17 +70,29 @@ object MasterGuardian extends GuardianBehavior {
   def apply(): Behavior[Nothing] = Behaviors.setup[Nothing] { ctx =>
 
     implicit val materializer: Materializer = Materializer(ctx.system.toClassic)
+    implicit val executionContext: ExecutionContext = ctx.executionContext
 
-    prepareCluster(ctx)
-    val eventSink = StatsServer(80)(ctx.system.toClassic)
-    spawnRam(ctx, eventSink)
+    val (eventSink, rateSource, serverBinding) = ManagementServer(80)(ctx.system.toClassic)
 
-    val coordinator = spawnCoordinator(ctx)
+    serverBinding.onComplete {
+      case Success(_) =>
 
-    StreamConverters.fromInputStream(() => System.in)
-      .collect(_.utf8String.filter(_ >= ' ').toInt)
-      .filter(_ >= 0)
-      .runForeach(coordinator ! F(_))
+        prepareCluster(ctx)
+
+        val remoteSink = StreamRefs.sinkRef[Stats]().to(eventSink).run()
+
+        val coordinator = spawnCoordinator(ctx)
+        coordinator ! SetEventSink(remoteSink)
+        spawnRam(ctx, eventSink)
+
+        rateSource
+          .filter(_ >= 0)
+          .runForeach(coordinator ! F(_))
+
+      case Failure(exception) =>
+        ctx.system.log.error("", exception)
+        CoordinatedShutdown(ctx.system).run(UnknownReason)
+    }
 
     Behaviors.ignore
   }
@@ -85,15 +103,24 @@ object WorkerGuardian extends GuardianBehavior {
 
   val serviceKey: ServiceKey[Int] = ServiceKey("meters")
 
-  def apply(masterAddress: String): Behavior[Nothing] = Behaviors.setup[Nothing] { ctx =>
-
+  def apply(masterAddress: String): Behavior[Nothing] = Behaviors.setup[SinkRef[Stats]] { ctx =>
+    implicit val materializer: Materializer = Materializer(ctx.system)
+    implicit val timeout: Timeout = Timeout(15.second)
+    implicit val executionContext: ExecutionContext = ctx.executionContext
     val cluster = prepareCluster(ctx)
     cluster.manager ! Join(AddressFromURIString(s"akka://batram-cluster@$masterAddress"))
+    val coordinator = spawnCoordinator(ctx)
 
-    spawnRam(ctx)
+    ctx.ask[GetEventSink, SinkRef[Stats]](coordinator, replyTo => GetEventSink(replyTo)) {
+      case Success(value) => value
+    }
 
-    Behaviors.ignore
-  }
+    Behaviors.receiveMessage {
+      sinkRef =>
+        spawnRam(ctx, sinkRef.sink())
+        Behaviors.ignore
+    }
+  }.narrow
 }
 
 object ClusterStateListener {
