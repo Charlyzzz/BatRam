@@ -1,4 +1,4 @@
-package batram
+package flow
 
 import akka.NotUsed
 import akka.actor.typed.scaladsl.Behaviors
@@ -6,11 +6,11 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.stream.stage._
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import batram.DynamicThrottle.{LinkThrottle, Message, Update}
+import flow.DynamicThrottle.{DynamicThrottleMessage, LinkThrottle, Update}
 
 import scala.concurrent.duration._
 
-class DynamicThrottle[A](n: Int, per: FiniteDuration)(throttler: ActorRef[Message]) extends GraphStage[FlowShape[A, A]] {
+class DynamicThrottle[A](n: Int, per: FiniteDuration)(throttler: ActorRef[DynamicThrottleMessage]) extends GraphStage[FlowShape[A, A]] {
   require(n >= 0, "number of elements should be > 0")
   require(per.length > 0, "time length should be > 0")
 
@@ -69,24 +69,24 @@ class DynamicThrottle[A](n: Int, per: FiniteDuration)(throttler: ActorRef[Messag
 
 object DynamicThrottle {
 
-  val behavior: Behavior[Message] = Behaviors.setup { _ =>
-    def linked(actor: ActorRef[Any]) = Behaviors.receiveMessagePartial[Message] {
+  val behavior: Behavior[DynamicThrottleMessage] = Behaviors.setup { _ =>
+    def linked(actor: ActorRef[Any]) = Behaviors.receiveMessagePartial[DynamicThrottleMessage] {
       case u: Update =>
         actor ! u
         Behaviors.same
     }
 
-    val waitingLink = Behaviors.receiveMessagePartial[Message] {
+    val waitingLink = Behaviors.receiveMessagePartial[DynamicThrottleMessage] {
       case LinkThrottle(actor) => linked(actor)
     }
 
     waitingLink
   }
 
-  trait Message
+  trait DynamicThrottleMessage
 
-  case class LinkThrottle(stageActor: ActorRef[Any]) extends Message
+  case class LinkThrottle(stageActor: ActorRef[Any]) extends DynamicThrottleMessage
 
-  case class Update(n: Int, per: FiniteDuration) extends Message
+  case class Update(n: Int, per: FiniteDuration = 1.second) extends DynamicThrottleMessage
 
 }

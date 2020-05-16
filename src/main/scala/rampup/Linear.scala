@@ -3,7 +3,7 @@ package rampup
 import akka.actor.typed.receptionist.Receptionist
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import rampup.Handler.serviceKey
+import rampup.JetControl.serviceKey
 
 import scala.concurrent.duration._
 

@@ -3,10 +3,10 @@ package rampup
 import akka.actor.typed.receptionist.{Receptionist, ServiceKey}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
-import rampup.Handler.serviceKey
+import rampup.JetControl.serviceKey
 
 
-object Handler {
+object JetControl {
   val serviceKey: ServiceKey[Int] = ServiceKey("meters")
 }
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>BatRam monitor</title>
+    <title>Carrier monitor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
 </head>
 <body>
@@ -91,10 +91,12 @@
 
       const { data } = config.data.datasets.find(d => d.label === n);
       data.push(v);
-      config.data.labels.push('');
+      console.log(config.data.labels.length)
       if (config.data.labels.length > 50) {
         config.data.labels.shift();
         data.shift();
+      }else {
+        config.data.labels.push('');
       }
       myLine.update();
     };
@@ -106,7 +108,6 @@
         if (addresses.indexOf(address) === -1) {
           const index = addresses.push(address) - 1;
           config.data.datasets.push(createDataset(address, chartColors[0]));
-          myLine.update();
         }
         addValue(address, parseInt(rps));
 

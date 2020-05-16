@@ -4,12 +4,8 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.Materializer
-import akka.stream.scaladsl.{Sink, StreamConverters}
-import batram.HttpRam
+import carrier.Jet
 import com.typesafe.config.ConfigFactory
-import rampup.{Linear, Manual}
-
-import scala.concurrent.duration._
 
 object Demo extends App {
 
@@ -29,18 +25,9 @@ object Demo extends App {
       .withMaxOpenRequests(maxOpenRequests)
       .withPipeliningLimit(pipeliningLimit)
 
-    val httpRam = ctx.spawn(
-      HttpRam("127.0.0.1", 3000, "http://127.0.0.1:3000/hi")(poolSettings, Sink.ignore),
-      "ram"
-    )
+    val jetBehavior = Jet("1", "d44mo8z3ie.execute-api.us-east-2.amazonaws.com", 443, "https://d44mo8z3ie.execute-api.us-east-2.amazonaws.com/dev?statusCode=502")(poolSettings)
 
-    val linearRampUp = ctx.spawn(Linear(20, 5.minutes)(httpRam), "LinearRampUp")
-    val manualRampUp = ctx.spawn(Manual(httpRam), "ManualRampUp")
-
-    StreamConverters.fromInputStream(() => System.in)
-      .collect(_.utf8String.filter(_ >= ' ').toInt)
-      .filter(_ >= 0)
-      .runForeach(manualRampUp ! _)
+    val jet = ctx.spawn(jetBehavior, "jet")
 
     Behaviors.ignore
   }
