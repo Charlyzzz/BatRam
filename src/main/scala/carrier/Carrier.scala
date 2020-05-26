@@ -19,14 +19,15 @@ import scala.util.{Failure, Success}
 
 object Carrier extends App {
 
-  val isMaster = sys.env.get("MASTER").isDefined
-  if (isMaster)
-    ActorSystem[Nothing](MasterGuardian(), "carrier")
-  else {
+  val isWorker = sys.env.contains("WORKER")
+  if (isWorker) {
     val masterAddress = sys.env.get("MASTER_ADDRESS")
     require(masterAddress.isDefined, "provide MASTER_ADDRESS")
     ActorSystem[Nothing](WorkerGuardian(masterAddress.get), "carrier")
+  } else {
+    ActorSystem[Nothing](MasterGuardian(), "carrier")
   }
+
 
 }
 
@@ -43,8 +44,8 @@ trait GuardianBehavior {
       .withPipeliningLimit(pipeliningLimit)
 
     val jetId = Cluster(ctx.system).selfMember.address.toString
-    val http = Jet(jetId, "127.0.0.1", 8000, "http://127.0.0.1:8000/")(poolSettings)
-    ctx.spawn(http, "jet")
+    val http = Jet(jetId, "http://127.0.0.1:8082/")(poolSettings)
+    ctx.spawn(http, "jet-1")
   }
 
   def prepareCluster(ctx: ActorContext[_]): Unit = {
@@ -69,7 +70,7 @@ object MasterGuardian extends GuardianBehavior {
       case Success(_) =>
         val (positionsDownlink, positionsSource) = Source.queue[Position](1024, OverflowStrategy.dropTail).preMaterialize
 
-        val radar = ctx.spawn(Radar(3.seconds, positionsDownlink), "radar")
+        val radar = ctx.spawn(Radar(1.seconds, positionsDownlink), "radar")
 
         rateOfFire.runForeach(radar ! ChangeFireRate(_))
 

@@ -10,12 +10,12 @@ import flow.DynamicThrottle.{DynamicThrottleMessage, LinkThrottle, Update}
 
 import scala.concurrent.duration._
 
-class DynamicThrottle[A](n: Int, per: FiniteDuration)(throttler: ActorRef[DynamicThrottleMessage]) extends GraphStage[FlowShape[A, A]] {
+class DynamicThrottle[A](n: Int)(throttler: ActorRef[DynamicThrottleMessage]) extends GraphStage[FlowShape[A, A]] {
   require(n >= 0, "number of elements should be > 0")
-  require(per.length > 0, "time length should be > 0")
 
   val in = Inlet[A]("DynamicThrottle.in")
   val out = Outlet[A]("DynamicThrottle.out")
+  val throttlerPeriod: FiniteDuration = 1.second
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic =
     new TimerGraphStageLogicWithLogging(shape) with InHandler with OutHandler {
@@ -23,14 +23,23 @@ class DynamicThrottle[A](n: Int, per: FiniteDuration)(throttler: ActorRef[Dynami
       var cap = n
       var remainingElements = n
       var onHold = false
-      var update: Option[Update] = None
+
+      def setNewCap(newCap: Int): Unit = {
+        if (newCap >= cap) {
+          val capDiff = newCap - cap
+          cap = newCap
+          remainingElements += capDiff
+        } else {
+          val capDiff = newCap - cap
+          cap = newCap
+          remainingElements = (remainingElements - capDiff).max(0)
+        }
+      }
 
       override def preStart(): Unit = {
-        scheduleAtFixedRate(NotUsed, 0.seconds, per)
+        scheduleAtFixedRate(NotUsed, 0.seconds, throttlerPeriod)
         val self = getStageActor {
-          case (_, m: Update) =>
-            update = Some(m)
-            log.info(s"$m")
+          case (_, Update(n)) => setNewCap(n)
           case _ =>
         }
         throttler ! LinkThrottle(self.ref.toTyped)
@@ -48,12 +57,6 @@ class DynamicThrottle[A](n: Int, per: FiniteDuration)(throttler: ActorRef[Dynami
       override def onPull(): Unit = pull(in)
 
       override protected def onTimer(timerKey: Any): Unit = {
-        update.foreach { u =>
-          cap = u.n
-          cancelTimer(NotUsed)
-          scheduleAtFixedRate(NotUsed, 0.seconds, u.per)
-          update = None
-        }
         remainingElements = cap
         if (onHold) {
           onHold = false
@@ -87,6 +90,6 @@ object DynamicThrottle {
 
   case class LinkThrottle(stageActor: ActorRef[Any]) extends DynamicThrottleMessage
 
-  case class Update(n: Int, per: FiniteDuration = 1.second) extends DynamicThrottleMessage
+  case class Update(n: Int) extends DynamicThrottleMessage
 
 }

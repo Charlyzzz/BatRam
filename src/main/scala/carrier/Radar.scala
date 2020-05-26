@@ -43,7 +43,11 @@ object Radar {
           activeJets.foreach(_ ! ReportAndClearPosition(jetPositionAdapter))
           Behaviors.same
         case ReceivedJetPosition(position) =>
-          downlink.offer(position)
+          val correctedRates = position.copy(
+            hits = position.hits / tickInterval.length.toInt,
+            misses = position.misses / tickInterval.length.toInt
+          )
+          downlink.offer(correctedRates)
           Behaviors.same
         case ChangeFireRate(requestPerSecond) =>
           activeJets.foreach(_ ! FireRate(requestPerSecond))

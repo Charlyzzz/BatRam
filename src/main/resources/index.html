@@ -33,16 +33,6 @@
     };
   };
 
-  /*
-  let datasets = [{
-    label: 'My First dataset',
-    backgroundColor: chartColors.red,
-    borderColor: chartColors.red,
-    data,
-    fill: false
-  }];
-   */
-
   const config = {
     type: 'line',
     data: {
@@ -50,6 +40,7 @@
       datasets: []
     },
     options: {
+      spanGaps: true,
       responsive: true,
       title: {
         display: true,
@@ -82,35 +73,77 @@
     }
   };
 
+  function newDatasource(maxTicks = 50) {
+    const ds = {
+      values: {},
+      sources: new Set(),
+      tick: 0,
+      push(who, value) {
+        this.sources.add(who);
+        const valuesSoFar = this.values[this.tick] || {};
+        valuesSoFar[who] = value;
+        this.values[this.tick] = valuesSoFar;
+        if (this.valuesCount() > maxTicks) {
+          this.trimExtraValues();
+        }
+      },
+      valuesFrom(who) {
+        return Object.entries(this.values).map(([tick, values]) => values[who]);
+      },
+      valuesCount() {
+        return Object.keys(this.values).length;
+      },
+      trimExtraValues() {
+        const entries = Object.entries(this.values);
+        entries.splice(0, 1);
+        this.values = Object.fromEntries(entries);
+      }
+    };
+
+    setInterval(() => {
+      ds.tick += 1;
+    }, 500);
+    return ds;
+  }
 
   window.onload = function () {
     const ctx = document.getElementById('canvas').getContext('2d');
     const myLine = new Chart(ctx, config);
-
-    const addValue = (n, v) => {
-
-      const { data } = config.data.datasets.find(d => d.label === n);
-      data.push(v);
-      console.log(config.data.labels.length)
-      if (config.data.labels.length > 50) {
-        config.data.labels.shift();
-        data.shift();
-      }else {
-        config.data.labels.push('');
-      }
+    const datasource = newDatasource(50);
+    const addValue = (address, rps) => {
+      datasource.push(address, rps);
+      const dataset = config.data.datasets.find(d => d.label === address);
+      dataset.data = datasource.valuesFrom(address);
+      config.data.labels = new Array(datasource.valuesCount()).fill('');
       myLine.update();
     };
     const addresses = [];
     const evtSource = new EventSource('metrics');
+    // const evtSource = {};
+    // const data = (rps, address) => {
+    //   return { data: JSON.stringify({ rps, address }) };
+    // };
+    //
+    // let n = 0;
+    // setInterval(() => {
+    //   n += 1;
+    //   evtSource.onmessage(data(n, '1'));
+    // }, 200);
+    //
+    // let n2 = 0;
+    // setInterval(() => {
+    //   n2 += 1;
+    //   evtSource.onmessage(data(n2, '2'));
+    // }, 200);
+
     evtSource.onmessage = (sse) => {
       try {
         const { rps, address } = JSON.parse(sse.data);
         if (addresses.indexOf(address) === -1) {
           const index = addresses.push(address) - 1;
-          config.data.datasets.push(createDataset(address, chartColors[0]));
+          config.data.datasets.push(createDataset(address, chartColors[index]));
         }
         addValue(address, parseInt(rps));
-
       } catch (e) {
         console.error(e);
       }

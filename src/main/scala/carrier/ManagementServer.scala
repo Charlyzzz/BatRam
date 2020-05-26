@@ -39,10 +39,7 @@ object ManagementServer {
       path("metrics") {
         get {
           complete {
-            sseSource.map { a =>
-              println(a)
-              a
-            }
+            sseSource
           }
         }
       }
