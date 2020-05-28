@@ -34,17 +34,17 @@ object Carrier extends App {
 trait GuardianBehavior {
 
   def spawnJet(ctx: ActorContext[_]): Unit = {
-    val maxConnections = sys.env.get("MC").collect(_.toInt).getOrElse(16384)
-    val maxOpenRequests = sys.env.get("OR").collect(_.toInt).getOrElse(32768)
-    val pipeliningLimit = sys.env.get("PL").collect(_.toInt).getOrElse(16)
+//    val maxConnections = sys.env.get("MC").collect(_.toInt).getOrElse(16384)
+//    val maxOpenRequests = sys.env.get("OR").collect(_.toInt).getOrElse(32768)
+//    val pipeliningLimit = sys.env.get("PL").collect(_.toInt).getOrElse(16)
 
     val poolSettings = ConnectionPoolSettings(ctx.system.toClassic)
-      .withMaxConnections(maxConnections)
-      .withMaxOpenRequests(maxOpenRequests)
-      .withPipeliningLimit(pipeliningLimit)
+//          .withMaxConnections(maxConnections)
+//          .withMaxOpenRequests(maxOpenRequests)
+//          .withPipeliningLimit(pipeliningLimit)
 
     val jetId = Cluster(ctx.system).selfMember.address.toString
-    val http = Jet(jetId, "http://127.0.0.1:8082/")(poolSettings)
+    val http = Jet(jetId, "http://localhost:8082/")(poolSettings)
     ctx.spawn(http, "jet-1")
   }
 
@@ -74,7 +74,7 @@ object MasterGuardian extends GuardianBehavior {
 
         rateOfFire.runForeach(radar ! ChangeFireRate(_))
 
-        positionsSource.to(positionsSink).run()
+        positionsSource.runWith(positionsSink)
 
         spawnJet(ctx)
 
