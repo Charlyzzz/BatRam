@@ -58,6 +58,10 @@ class DynamicThrottle[A](n: Int)(throttler: ActorRef[DynamicThrottleMessage]) ex
 
       override protected def onTimer(timerKey: Any): Unit = {
         remainingElements = cap
+        push()
+      }
+
+      private def push(): Unit = {
         if (onHold) {
           onHold = false
           onPush()

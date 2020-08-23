@@ -26,8 +26,7 @@ object LinearRamping {
 
   case object ModifyCurrent
 
-
-  def apply(step: Int, stepDuration: FiniteDuration, adapter: Int => Unit): Behavior[Int] = Behaviors.setup[Any] { ctx =>
+  def apply(step: Int, stepDuration: FiniteDuration, onRateChange: Int => Unit): Behavior[Int] = Behaviors.setup[Any] { ctx =>
 
     def scheduleIncrease(): Unit = ctx.scheduleOnce(stepDuration, ctx.self, ModifyCurrent)
 
@@ -38,7 +37,7 @@ object LinearRamping {
       case ModifyCurrent =>
         val newCurrent = (current + step).min(target)
         ctx.log.debug(s"Updating rate $newCurrent")
-        adapter(newCurrent)
+        onRateChange(newCurrent)
         if (newCurrent == target) {
           ctx.log.debug("Finished, transitioning to idle")
           idle(newCurrent)

@@ -13,7 +13,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-http" % "10.1.10",
   "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % "1.0.5" exclude("com.typesafe.akka", "akka-discovery"),
   "com.typesafe.akka" %% "akka-discovery" % akkaVersion,
-  "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime
+  "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime,
+  "com.amazonaws" % "aws-java-sdk" % "1.11.820"
 )
 
 enablePlugins(JavaAppPackaging)

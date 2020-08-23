@@ -1,60 +1,77 @@
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props, Timers}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpRequest, Uri}
-import akka.http.scaladsl.settings.ConnectionPoolSettings
-import akka.stream.scaladsl.Source
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.settings.{ClientConnectionSettings, ConnectionPoolSettings}
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.typesafe.config.ConfigFactory
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 object PoolTest extends App {
-  val uri = Uri("http://localhost:8082")
-  implicit val system = ActorSystem("pool", ConfigFactory.empty())
+  val uri = Uri("http://10.0.1.5:8082")
+  implicit val system: ActorSystem = ActorSystem("pool", ConfigFactory.parseString(
+    """
+      |
+      | akka.io.tcp {
+      |  nr-of-selectors = 3
+      | }
+      |""".stripMargin))
+
   val address = uri.authority.host.address()
   val port = uri.authority.port
 
-  class Tracker extends Actor with ActorLogging {
+  object Track
+
+  object Reset
+
+  class Tracker extends Actor with ActorLogging with Timers {
     var requestCount = 0
 
-
-    override def aroundPreStart(): Unit = {
-      context.system.scheduler.scheduleAtFixedRate(0.seconds, 1.second)(() => self ! "reset")(context.dispatcher)
+    override def preStart(): Unit = {
+      timers.startTimerAtFixedRate("timerName", Reset, 1.second)
     }
 
     override def receive: Receive = {
-      case "track" =>
+      case Track =>
         requestCount += 1
-      case "reset" =>
+      case Reset =>
         log.info(requestCount.toString)
         requestCount = 0
     }
   }
+
   val tracker = system.actorOf(Props[Tracker])
 
+  pool
 
-//  val maxConnections = sys.env.get("MC").collect(_.toInt).getOrElse(8096)
-//  val maxOpenRequests = sys.env.get("OR").collect(_.toInt).getOrElse(32768)
-//  val pipeliningLimit = sys.env.get("PL").collect(_.toInt).getOrElse(16)
-  val poolSettings = ConnectionPoolSettings(system)
-//    .withMaxConnections(maxConnections)
-//    .withMaxOpenRequests(maxOpenRequests)
-//    .withPipeliningLimit(pipeliningLimit)
 
-  val pool = Http().cachedHostConnectionPool[NotUsed](address, port, poolSettings)
-
-  Source.repeat(NotUsed)
-    .map((HttpRequest(uri = uri), _))
-    .throttle(15000, 1.second)
+  Source
+    .repeat(HttpRequest(uri = uri))
+    //.throttle(10000, 1.second)
     .via(pool)
-    .map(_._1)
-    .runForeach {
-
-      case Success(response) =>
-        tracker ! "track"
-        response.discardEntityBytes()
-      case Failure(_) =>
+    .runForeach { response =>
+      tracker ! Track
+      response.discardEntityBytes()
     }
+
+  def pool: Flow[HttpRequest, HttpResponse, NotUsed] = {
+    val poolSettings = ConnectionPoolSettings(system)
+      .withMaxConnections(512)
+    val poolFlow = Http().cachedHostConnectionPool[NotUsed](address, port, poolSettings)
+    Flow[HttpRequest]
+      .map((_, NotUsed))
+      .via(poolFlow)
+      .map(_._1)
+      .collect {
+        case Success(response) => response
+      }
+  }
+
+  def single = {
+    Http().outgoingConnection(uri.authority.host.address(), port)
+  }
 
 }

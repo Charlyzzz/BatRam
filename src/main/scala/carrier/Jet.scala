@@ -48,7 +48,7 @@ object Jet {
     ctx.system.receptionist ! Receptionist.register(Jet.key, ctx.self)
 
     val throttler: ActorRef[DynamicThrottleMessage] = ctx.spawnAnonymous(DynamicThrottle.behavior)
-    implicit val ramper: ActorRef[Int] = ctx.spawnAnonymous(LinearRamping(1000, 5.seconds, throttler ! Update(_)))
+    implicit val ramper: ActorRef[Int] = ctx.spawnAnonymous(LinearRamping(300, 5.seconds, throttler ! Update(_)))
 
     val pool = Http().cachedHostConnectionPool[NotUsed](address, port, poolSettings)
 
